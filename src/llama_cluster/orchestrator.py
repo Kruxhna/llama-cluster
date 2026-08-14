@@ -160,6 +160,7 @@ class AeroMeshOrchestrator:
             "--host", self.config.host,
             "--port", str(srv_port),
             "-ngl", "99",
+            "-sm", "layer",
         ]
         if rpc_targets:
             cmd.extend(["--rpc", ",".join(rpc_targets)])
