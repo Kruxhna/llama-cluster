@@ -50,10 +50,18 @@ if (Test-Path "llama.cpp") {
         New-Item -ItemType Directory -Path "llama.cpp\build" | Out-Null
     }
     Set-Location "llama.cpp\build"
-    cmake .. -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
-    cmake --build . --config Release
+    try {
+        if (Get-Command "ninja" -ErrorAction SilentlyContinue) {
+            cmake .. -G "Ninja" -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
+        } else {
+            cmake .. -G "Visual Studio 17 2022" -A x64 -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
+        }
+        cmake --build . --config Release
+        Write-Host "[+] Native llama.cpp build complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "[!] Note: C++ build tools (Visual Studio C++ Desktop workload or Ninja) not detected in PATH. Using Python orchestration and pre-compiled runtime." -ForegroundColor Yellow
+    }
     Set-Location $RepoRoot
-    Write-Host "[+] Native llama.cpp build complete!" -ForegroundColor Green
 } else {
     Write-Host "[!] Warning: llama.cpp directory missing. Clone submodules with: git submodule update --init --recursive" -ForegroundColor Yellow
 }

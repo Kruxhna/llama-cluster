@@ -9,6 +9,8 @@ import sys
 import socket
 from typing import Dict, Any, Optional
 
+import warnings
+
 try:
     import psutil
     HAS_PSUTIL = True
@@ -16,7 +18,9 @@ except ImportError:
     HAS_PSUTIL = False
 
 try:
-    import pynvml
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import pynvml
     HAS_NVML = True
 except ImportError:
     HAS_NVML = False

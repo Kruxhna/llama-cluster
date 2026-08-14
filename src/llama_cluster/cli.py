@@ -55,13 +55,34 @@ def cmd_status(args: argparse.Namespace):
     print(f"[*] Telemetry Target       : {'NVIDIA NVML Active' if telemetry.nvml_initialized else 'CPU / psutil Fallback'}")
     print(f"[*] Telemetry Interval     : {cfg.telemetry_interval_ms} ms")
     
-    print("\n--- Local Node Metrics (200ms Telemetry Stream) ---")
+    print("\n--- Local Machine Metrics (200ms Telemetry Stream) ---")
     print(f"  - GPU Temp        : {metrics['gpu_temp_celsius']} C")
     print(f"  - GPU Power       : {metrics['gpu_power_draw_watts']} W")
     print(f"  - VRAM Free       : {metrics['vram_free_bytes'] / (1024*1024*1024):.2f} GB")
     print(f"  - System RAM Free : {metrics['ram_free_bytes'] / (1024*1024*1024):.2f} GB")
     print(f"  - CPU Load        : {metrics['cpu_utilization_percent']} %")
-    print(f"  - Network RTT     : {metrics['network_rtt_to_coordinator_ms']} ms")
+
+    # Display configured cluster nodes & live reachability
+    nodes = cfg.topology.get("nodes", [])
+    print(f"\n--- Cluster Topology ({len(nodes)} Configured Nodes) ---")
+    for n in nodes:
+        name = n.get("name", "Node")
+        ip = n.get("ip", "127.0.0.1")
+        port = n.get("rpc_port", 50052)
+        vram = n.get("usable_vram_gb", 0.0)
+        gpu = n.get("gpu_model", "GPU")
+        
+        # Ping target node to check connection latency
+        rtt = telemetry.measure_network_rtt(ip, port=port, timeout=0.8)
+        if rtt < 900:
+            link_status = f"ONLINE (RTT: {rtt:.1f} ms)"
+        else:
+            link_status = "READY (Awaiting node daemon start)"
+
+        print(f"  * [{name}] @ {ip}:{port}")
+        print(f"      GPU Model     : {gpu}")
+        print(f"      Usable VRAM   : {vram} GB")
+        print(f"      Link Status   : {link_status}")
 
     # List GGUF models
     models = list(cfg.model_dir.glob("*.gguf")) if cfg.model_dir.exists() else []
@@ -71,7 +92,7 @@ def cmd_status(args: argparse.Namespace):
             size_gb = m.stat().st_size / (1024 * 1024 * 1024)
             print(f"  - {m.name} ({size_gb:.2f} GB)")
     else:
-        print("  (No GGUF models downloaded yet. Run `aeromesh download` to obtain Qwen2.5-32B!)")
+        print("  (No GGUF models downloaded yet. Run `aeromesh download` to fetch weights!)")
 
     telemetry.close()
 
