@@ -128,12 +128,30 @@ class AeroMeshOrchestrator:
 
         nodes = self.config.topology.get("nodes", [])
         rpc_targets = []
+        split_weights = []
+
+        coord_node = next((n for n in nodes if n.get("is_stable_coordinator")), None)
+        coord_name = (coord_node.get("name") if coord_node else None) or self.coord_name
+        split_weights.append(str(rebalance["allocations"].get(coord_name, 14)))
+
+        print("\n--- Pre-Flight Node Connectivity Check ---")
         for n in nodes:
             name = n.get("name", "")
-            if not n.get("is_stable_coordinator") and name in rebalance["active_nodes"]:
-                ip = n.get("ip", "127.0.0.1")
-                rpc_port = n.get("rpc_port", 50052)
+            if name == coord_name or n.get("is_stable_coordinator", False):
+                print(f"  [+] Local Coordinator ({name}): READY")
+                continue
+
+            ip = n.get("ip", "127.0.0.1")
+            rpc_port = n.get("rpc_port", 50052)
+            
+            # Check live TCP reachability
+            rtt = self.telemetry.measure_network_rtt(ip, port=rpc_port, timeout=1.0)
+            if rtt < 900:
+                print(f"  [+] Worker Node [{name}] @ {ip}:{rpc_port} -> ONLINE ({rtt:.1f} ms)")
                 rpc_targets.append(f"{ip}:{rpc_port}")
+                split_weights.append(str(rebalance["allocations"].get(name, 20)))
+            else:
+                print(f"  [!] Worker Node [{name}] @ {ip}:{rpc_port} -> UNREACHABLE (Awaiting `aeromesh node` start on {name})")
 
         srv_port = port or self.config.port
         cmd = [
@@ -141,14 +159,20 @@ class AeroMeshOrchestrator:
             "-m", str(model_file),
             "--host", self.config.host,
             "--port", str(srv_port),
+            "-ngl", "99",
         ]
         if rpc_targets:
             cmd.extend(["--rpc", ",".join(rpc_targets)])
+            if len(split_weights) > 1:
+                cmd.extend(["-ts", ",".join(split_weights)])
 
-        print("=== Launching AeroMesh Master Control Plane ===")
-        print(f"[*] Executable: {binary}")
-        print(f"[*] Model Path: {model_file}")
-        print(f"[*] Endpoint: http://{self.config.host}:{srv_port}")
+        print("\n=== Launching AeroMesh Master Control Plane ===")
+        print(f"[*] Executable    : {binary}")
+        print(f"[*] Model Path    : {model_file}")
+        print(f"[*] Endpoint      : http://{self.config.host}:{srv_port}")
+        print(f"[*] Tensor Split  : {','.join(split_weights)} (Layers per Node)")
+        if rpc_targets:
+            print(f"[*] RPC Targets   : {', '.join(rpc_targets)}")
 
         try:
             self.server_process = subprocess.Popen(cmd)
