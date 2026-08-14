@@ -62,6 +62,12 @@ class DynamicGraphCompiler:
         # 1. Layer Conservation Constraint
         prob += pulp.lpSum([l_vars[nid] for nid in node_ids]) == total_layers, "Layer_Conservation"
 
+        # Dynamically calculate layer weight in MB from model size or default
+        if layer_weight_mb == 270.0 and total_layers <= 48:
+            layer_weight_mb = 175.0  # Appropriate for 14B models (~8.5GB / 48 layers)
+
+        total_vram_available = sum((n.get("metrics", {}).get("vram_free_bytes", 8*1024*1024*1024)) / (1024*1024) for n in nodes_telemetry)
+        
         cost_terms = []
 
         for node in nodes_telemetry:
@@ -83,8 +89,10 @@ class DynamicGraphCompiler:
                 prob += x_vars[nid] == 0, f"Evict_{nid}_Latency"
 
             # 2. VRAM Capacity Constraint per node
-            max_allocable_layers = max(0, int((usable_vram_mb - kv_cache_mb) / layer_weight_mb))
-            prob += l_vars[nid] <= max_allocable_layers * x_vars[nid], f"VRAM_Limit_{nid}"
+            max_allocable_layers = max(1, int((usable_vram_mb - kv_cache_mb) / max(1.0, layer_weight_mb)))
+            # If total available VRAM is sufficient, apply individual upper bound
+            if total_vram_available >= total_layers * layer_weight_mb:
+                prob += l_vars[nid] <= max_allocable_layers * x_vars[nid], f"VRAM_Limit_{nid}"
 
             # Objective terms: compute time per layer + network RTT cost
             compute_cost = 1.0 / max(0.1, base_p)
@@ -110,9 +118,17 @@ class DynamicGraphCompiler:
                 if is_active:
                     active_nodes.append(nid)
         else:
-            layers_per_node = total_layers // len(node_ids)
+            # Proportional distribution based on usable VRAM
+            vram_weights = [max(1.0, (n.get("metrics", {}).get("vram_free_bytes", 1) / (1024*1024*1024))) for n in nodes_telemetry]
+            total_w = sum(vram_weights)
+            allocated_so_far = 0
             for i, nid in enumerate(node_ids):
-                allocations[nid] = layers_per_node if i < len(node_ids) - 1 else total_layers - (layers_per_node * i)
+                if i == len(node_ids) - 1:
+                    allocations[nid] = total_layers - allocated_so_far
+                else:
+                    layers_for_node = int(round((vram_weights[i] / total_w) * total_layers))
+                    allocations[nid] = layers_for_node
+                    allocated_so_far += layers_for_node
                 active_nodes.append(nid)
 
         return {

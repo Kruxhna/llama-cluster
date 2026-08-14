@@ -43,6 +43,8 @@ class AeroMeshOrchestrator:
         local_payload = self.telemetry.get_telemetry_payload("127.0.0.1")
         local_payload["node_id"] = coord_name
         local_payload["compute_tflops"] = coord_node.get("compute_tflops", 15.0) if coord_node else 15.0
+        if coord_node and "usable_vram_gb" in coord_node:
+            local_payload["metrics"]["vram_free_bytes"] = int(coord_node["usable_vram_gb"] * 1024 * 1024 * 1024)
         collected.append(local_payload)
 
         # Remote Workers (Laptop B, Laptop C) Telemetry Simulation/Fetch
