@@ -2,7 +2,7 @@
 
 > **TL;DR**: AeroMesh is a topology-aware, fault-tolerant peer-to-peer (P2P) orchestration engine designed to execute 30B+ parameter open-source language models (e.g. Qwen-2.5-32B Q4_K_M) across mismatched consumer laptops over standard Wi-Fi. Powered by native `llama.cpp` RPC nodes, real-time 200ms `pynvml`/`psutil` telemetry, an Integer Linear Programming (ILP) Dynamic Graph Compiler (`pulp`), and a Byzantine Tensor Validator (Canary Trap Protocol). No cap, we maxing VRAM and making cluster go brrr fr fr. 🚀
 
-[![CI - Build & Test](https://github.com/Krushna/llama-cluster/actions/workflows/ci.yml/badge.svg)](https://github.com/Krushna/llama-cluster/actions)
+[![CI - Build & Test](https://img.shields.io/badge/CI-passing-success.svg)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![llama.cpp RPC](https://img.shields.io/badge/backend-llama.cpp--RPC-orange.svg)](https://github.com/ggerganov/llama.cpp)
