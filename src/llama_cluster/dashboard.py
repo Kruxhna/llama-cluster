@@ -33,7 +33,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Suppress noisy default static file request logging."""
-        if "/api/" in (args[0] if args else ""):
+        first_arg = str(args[0]) if args else ""
+        if "/api/" in first_arg:
             super().log_message(format, *args)
 
     def do_GET(self):
@@ -211,7 +212,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def handle_post_config_update(self, payload: Dict[str, Any]):
         """Updates and persists cluster.yaml."""
         cfg = get_config()
-        config_path = cfg.config_file
+        config_path = cfg.config_path
         
         if not config_path.exists():
             config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -250,28 +251,44 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self.send_json({"status": "stopped"})
 
     def handle_post_chat(self, payload: Dict[str, Any]):
-        """Tests chat completion against local coordinator endpoint."""
+        """Tests chat completion against configured coordinator endpoint."""
         prompt = payload.get("prompt", "Hello AeroMesh!")
         max_tokens = payload.get("max_tokens", 50)
         
+        cfg = get_config()
+        coord_cfg = cfg.topology.get("coordinator", {})
+        coord_host = coord_cfg.get("host", "127.0.0.1")
+        coord_port = coord_cfg.get("control_port", 8080)
+        
+        target_hosts = []
+        if coord_host and coord_host not in ("0.0.0.0", "127.0.0.1", "localhost"):
+            target_hosts.append(coord_host)
+        target_hosts.extend(["127.0.0.1", "localhost"])
+
         import urllib.request
-        try:
-            req_data = json.dumps({
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens
-            }).encode("utf-8")
-            
-            req = urllib.request.Request(
-                "http://127.0.0.1:8080/v1/chat/completions",
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                resp_json = json.loads(resp.read().decode("utf-8"))
-                self.send_json(resp_json)
-        except Exception as e:
-            self.send_json({"error": f"Coordinator offline or request failed: {e}"}, status=502)
+        req_data = json.dumps({
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens
+        }).encode("utf-8")
+
+        last_err = None
+        for host in target_hosts:
+            target_url = f"http://{host}:{coord_port}/v1/chat/completions"
+            try:
+                req = urllib.request.Request(
+                    target_url,
+                    data=req_data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    resp_json = json.loads(resp.read().decode("utf-8"))
+                    self.send_json(resp_json)
+                    return
+            except Exception as e:
+                last_err = f"Failed to connect to {target_url}: {e}"
+
+        self.send_json({"error": f"Coordinator offline. {last_err}. Ensure 'aeromesh start' is running on the coordinator machine!"}, status=502)
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 3000):
