@@ -71,19 +71,13 @@ class NodeDaemon:
         print(f"[*] Executable: {binary}")
 
         try:
-            self.rpc_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
+            self.rpc_process = subprocess.Popen(cmd)
             time.sleep(1.0)
             if self.rpc_process.poll() is not None:
-                _, err = self.rpc_process.communicate()
-                print(f"[!] RPC process terminated immediately: {err}")
+                print(f"[!] RPC process terminated immediately with exit code {self.rpc_process.returncode}")
                 return False
 
-            print(f"[+] RPC worker node {self.node_name} active on port {self.rpc_port}! We cookin now.")
+            print(f"[+] RPC worker node {self.node_name} active on port {self.rpc_port}! Ready for incoming tensor allocations.")
             return True
 
         except Exception as e:
