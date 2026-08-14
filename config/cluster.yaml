@@ -1,8 +1,8 @@
 cluster_name: "aeromesh-3-laptop-tailscale-cluster"
 
 coordinator:
-  node_id: "Laptop_A_Coordinator"
-  host: "100.101.147.24"
+  node_id: "Laptop_B_Coordinator"
+  host: "100.66.49.50"
   control_port: 8080
 
 model_spec:
