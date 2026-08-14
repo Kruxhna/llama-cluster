@@ -83,8 +83,8 @@ $$S_{\text{mismatch}} = \frac{\|v_{\text{actual}} - v_{\text{ref}}\|_2}{\|v_{\te
 
 ### 1. Clone with Submodules
 ```bash
-git clone --recursive https://github.com/tex1ure/AeroMesh-vap-2026.git AeroMesh
-cd AeroMesh
+git clone --recursive https://github.com/tex1ure/AeroMesh-vap-2026.git
+cd AeroMesh-vap-2026
 ```
 
 ### 2. Install & Build
