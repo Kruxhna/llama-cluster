@@ -151,7 +151,12 @@ If your laptops are on different Wi-Fi networks (e.g. home vs college dorm vs ph
 
 ---
 
-## CLI Usage
+### Launch Web Control Dashboard
+Launch the interactive real-time control plane and telemetry dashboard:
+```bash
+aeromesh dashboard --port 3000
+```
+Open **`http://localhost:3000`** in any browser on your mesh.
 
 ### Check Node Status & VRAM
 ```bash
@@ -171,7 +176,7 @@ aeromesh node --name Laptop_B --port 50052
 
 ### Start the Coordinator (on Laptop A)
 ```bash
-aeromesh start --model Qwen2.5-32B-Instruct-Q4_K_M.gguf --port 8080
+aeromesh start --model DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf --port 8080
 ```
 
 ### Network Chaos Testing (via Toxiproxy)
@@ -199,12 +204,14 @@ AeroMesh/
 ├── src/llama_cluster/
 │   ├── canary_validator.py      # Canary Trap tensor validator (L2 distance)
 │   ├── chaos.py                 # Toxiproxy network chaos client
-│   ├── cli.py                   # CLI commands (status, rebalance, start, node)
+│   ├── cli.py                   # CLI commands (status, rebalance, start, node, dashboard)
 │   ├── config.py                # Root-relative path and environment loader
+│   ├── dashboard.py             # Web Control Dashboard REST & Static backend
 │   ├── graph_compiler.py        # Integer Linear Programming layer solver (PuLP)
 │   ├── node.py                  # Worker node daemon (spawns llama-rpc-server)
 │   ├── orchestrator.py          # Master control plane & between-turn rebalancer
-│   └── telemetry.py             # Dual-tier hardware collector (pynvml + psutil)
+│   ├── telemetry.py             # Dual-tier hardware collector (pynvml + psutil)
+│   └── web/                     # Web Dashboard UI (index.html, style.css, app.js)
 ├── tests/                       # Pytest unit & integration test suite
 ├── .env.example                 # Safe environment configuration template
 ├── CONTRIBUTING.md              # Contributor guidelines & architecture rules
