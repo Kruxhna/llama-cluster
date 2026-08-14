@@ -177,14 +177,29 @@ class AeroMeshOrchestrator:
 
         try:
             self.server_process = subprocess.Popen(cmd)
-            print(f"[+] Master Coordinator live! We cookin now. API: http://localhost:{srv_port}/v1")
+            print(f"[+] Master Coordinator live! API: http://localhost:{srv_port}/v1")
+            
+            # Automatically spawn Web Dashboard
+            try:
+                from llama_cluster.dashboard import start_dashboard_background
+                self.dashboard_server = start_dashboard_background(host="0.0.0.0", port=3000)
+            except Exception as e:
+                print(f"[!] Warning: Could not auto-launch dashboard: {e}")
+
             return True
         except Exception as e:
             print(f"[!] Failed to launch master coordinator process: {e}")
             return False
 
     def stop_cluster(self):
-        """Stops running master coordinator process cleanly."""
+        """Stops running master coordinator process and dashboard cleanly."""
+        if hasattr(self, "dashboard_server") and self.dashboard_server:
+            try:
+                self.dashboard_server.shutdown()
+                self.dashboard_server.server_close()
+            except Exception:
+                pass
+
         if self.server_process and self.server_process.poll() is None:
             print("[*] Terminating master control plane process...")
             self.server_process.terminate()

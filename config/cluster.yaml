@@ -1,35 +1,40 @@
 cluster_name: aeromesh-3-laptop-tailscale-cluster
+
 coordinator:
   node_id: Laptop_B
   host: 100.66.49.50
   control_port: 8080
+
 model_spec:
   name: DeepSeek-R1-Distill-Qwen-14B-Q4_K_M
   file: DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf
   total_layers: 48
   context_length: 2048
+
 nodes:
-- name: Laptop_A
-  role: Primary Execution Worker
-  ip: 100.101.147.24
-  rpc_port: 50052
-  gpu_model: NVIDIA RTX 4060 Mobile
-  usable_vram_gb: 7.5
-  compute_tflops: 15
-  is_stable_coordinator: false
-- name: Laptop_B
-  role: Primary Execution Worker
-  ip: 100.66.49.50
-  rpc_port: 50052
-  gpu_model: NVIDIA RTX 4060 Mobile
-  usable_vram_gb: 9.5
-  compute_tflops: 15
-  is_stable_coordinator: true
-- name: Laptop_C
-  role: Secondary Execution Worker
-  ip: 100.122.125.95
-  rpc_port: 50052
-  gpu_model: NVIDIA RTX 3050 Mobile
-  usable_vram_gb: 4.8
-  compute_tflops: 9
-  is_stable_coordinator: false
+  - name: Laptop_A
+    role: Primary Execution Worker
+    ip: 100.101.147.24
+    rpc_port: 50052
+    gpu_model: NVIDIA RTX 4060 Mobile
+    usable_vram_gb: 7.5
+    compute_tflops: 15.0
+    is_stable_coordinator: false
+
+  - name: Laptop_B
+    role: Coordinator & Primary Worker
+    ip: 100.66.49.50
+    rpc_port: 50052
+    gpu_model: NVIDIA RTX 4060 Mobile
+    usable_vram_gb: 9.5
+    compute_tflops: 15.0
+    is_stable_coordinator: true
+
+  - name: Laptop_C
+    role: Secondary Execution Worker
+    ip: 100.122.125.95
+    rpc_port: 50052
+    gpu_model: NVIDIA RTX 3050 Mobile
+    usable_vram_gb: 4.8
+    compute_tflops: 9.0
+    is_stable_coordinator: false

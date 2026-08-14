@@ -57,6 +57,10 @@ class Config:
         self.config_path: Path = config_path or (REPO_ROOT / "config" / "cluster.yaml")
         self.topology: Dict[str, Any] = self._load_topology()
 
+    @property
+    def config_file(self) -> Path:
+        return self.config_path
+
     def _load_topology(self) -> Dict[str, Any]:
         """Loads cluster allocation profile from cluster.yaml or returns 3-laptop default."""
         if self.config_path.exists():

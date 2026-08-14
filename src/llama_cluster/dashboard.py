@@ -33,9 +33,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Suppress noisy default static file request logging."""
-        first_arg = str(args[0]) if args else ""
-        if "/api/" in first_arg:
-            super().log_message(format, *args)
+        try:
+            msg = format % args if args else str(format)
+            if "/api/" in str(msg):
+                super().log_message(format, *args)
+        except Exception:
+            pass
+
+    def do_OPTIONS(self):
+        """Handles CORS pre-flight requests."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -86,13 +97,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def send_json(self, data: Any, status: int = 200):
         """Helper to send JSON response with CORS headers."""
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, indent=2).encode("utf-8"))
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.end_headers()
+            self.wfile.write(json.dumps(data, indent=2).encode("utf-8"))
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
+        except Exception:
+            pass
 
     def handle_get_cluster(self):
         """Returns full cluster configuration, current layer allocations, and model spec."""
@@ -211,26 +227,29 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def handle_post_config_update(self, payload: Dict[str, Any]):
         """Updates and persists cluster.yaml."""
-        cfg = get_config()
-        config_path = cfg.config_path
-        
-        if not config_path.exists():
-            config_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            cfg = get_config()
+            config_path = cfg.config_path
+            
+            if not config_path.exists():
+                config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        current_data = cfg.topology
-        if "cluster_name" in payload:
-            current_data["cluster_name"] = payload["cluster_name"]
-        if "coordinator" in payload:
-            current_data["coordinator"] = payload["coordinator"]
-        if "model_spec" in payload:
-            current_data["model_spec"] = payload["model_spec"]
-        if "nodes" in payload:
-            current_data["nodes"] = payload["nodes"]
+            current_data = cfg.topology or {}
+            if "cluster_name" in payload:
+                current_data["cluster_name"] = payload["cluster_name"]
+            if "coordinator" in payload:
+                current_data["coordinator"] = payload["coordinator"]
+            if "model_spec" in payload:
+                current_data["model_spec"] = payload["model_spec"]
+            if "nodes" in payload:
+                current_data["nodes"] = payload["nodes"]
 
-        with open(config_path, "w", encoding="utf-8") as f:
-            yaml.dump(current_data, f, sort_keys=False, default_flow_style=False)
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(current_data, f, sort_keys=False, default_flow_style=False)
 
-        self.send_json({"status": "Saved", "topology": current_data})
+            self.send_json({"status": "Saved", "topology": current_data})
+        except Exception as e:
+            self.send_json({"error": f"Failed to save configuration: {e}"}, status=500)
 
     def handle_post_cluster_start(self, payload: Dict[str, Any]):
         """Starts the coordinator llama-server."""
@@ -289,6 +308,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 last_err = f"Failed to connect to {target_url}: {e}"
 
         self.send_json({"error": f"Coordinator offline. {last_err}. Ensure 'aeromesh start' is running on the coordinator machine!"}, status=502)
+
+
+def start_dashboard_background(host: str = "0.0.0.0", port: int = 3000) -> Optional[HTTPServer]:
+    """Starts the AeroMesh Web Control Dashboard HTTP server in a background daemon thread."""
+    try:
+        server_address = (host, port)
+        httpd = HTTPServer(server_address, DashboardRequestHandler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        print(f"[+] Web Control Dashboard Live : http://localhost:{port}")
+        return httpd
+    except Exception as e:
+        print(f"[!] Warning: Could not bind Web Dashboard on port {port}: {e}")
+        return None
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 3000):
