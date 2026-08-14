@@ -34,14 +34,20 @@ class NodeDaemon:
         }
 
     def find_rpc_binary(self) -> Optional[Path]:
-        """Looks up llama-rpc-server or rpc-server binary in llama.cpp build directory."""
+        """Looks up llama-rpc-server, ggml-rpc-server, or rpc-server binary in build directories."""
         candidates = [
-            self.config.llama_cpp_dir / "build" / "bin" / "llama-rpc-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "ggml-rpc-server.exe",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "llama-rpc-server.exe",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "rpc-server.exe",
+            self.config.llama_cpp_dir / "build" / "bin" / "ggml-rpc-server.exe",
             self.config.llama_cpp_dir / "build" / "bin" / "llama-rpc-server.exe",
-            self.config.llama_cpp_dir / "build" / "bin" / "rpc-server",
             self.config.llama_cpp_dir / "build" / "bin" / "rpc-server.exe",
-            self.config.llama_cpp_dir / "rpc-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "ggml-rpc-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "ggml-rpc-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "llama-rpc-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "rpc-server",
             self.config.llama_cpp_dir / "rpc-server.exe",
+            self.config.llama_cpp_dir / "rpc-server",
         ]
         for candidate in candidates:
             if candidate.exists():

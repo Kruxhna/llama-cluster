@@ -82,10 +82,14 @@ class AeroMeshOrchestrator:
     def find_server_binary(self) -> Optional[Path]:
         """Looks up native llama-server binary in build output directories."""
         candidates = [
-            self.config.llama_cpp_dir / "build" / "bin" / "llama-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "llama-server.exe",
+            self.config.llama_cpp_dir / "build" / "bin" / "RelWithDebInfo" / "llama-server.exe",
+            self.config.llama_cpp_dir / "build" / "bin" / "Debug" / "llama-server.exe",
             self.config.llama_cpp_dir / "build" / "bin" / "llama-server.exe",
-            self.config.llama_cpp_dir / "llama-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "llama-server",
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "llama-server",
             self.config.llama_cpp_dir / "llama-server.exe",
+            self.config.llama_cpp_dir / "llama-server",
         ]
         for candidate in candidates:
             if candidate.exists():
