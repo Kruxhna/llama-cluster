@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🧪 Running AeroMesh Integration Test Suite... 🧪" -ForegroundColor Cyan
+Write-Host "[*] Running AeroMesh Integration Test Suite..." -ForegroundColor Cyan
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $RepoRoot = Resolve-Path "$ScriptDir\.."
@@ -25,4 +25,4 @@ if (Get-Command "uv" -ErrorAction SilentlyContinue) {
 }
 
 Write-Host ""
-Write-Host "✅ All AeroMesh integration tests passed clean! Zero cap." -ForegroundColor Green
+Write-Host "[+] All AeroMesh integration tests passed clean!" -ForegroundColor Green

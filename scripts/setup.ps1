@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔥 [1/4] Setting up AeroMesh environment on Native Windows Host... 🔥" -ForegroundColor Cyan
+Write-Host "[1/4] Setting up AeroMesh environment on Native Windows Host..." -ForegroundColor Cyan
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $RepoRoot = Resolve-Path "$ScriptDir\.."
@@ -14,26 +14,27 @@ Set-Location $RepoRoot
 
 # Verify Python
 if (-not (Get-Command "python" -ErrorAction SilentlyContinue)) {
-    Write-Error "❌ Error: Python is required but not installed or not added to PATH."
+    Write-Error "Error: Python is required but not installed or not added to PATH."
     exit 1
 }
 
+$VenvPython = "$RepoRoot\.venv\Scripts\python.exe"
+
 # Create virtualenv via uv if installed, else python venv
 if (Get-Command "uv" -ErrorAction SilentlyContinue) {
-    Write-Host "⚡ Using 'uv' package manager for ultra-fast setup..." -ForegroundColor Green
+    Write-Host "[*] Using 'uv' package manager for ultra-fast setup..." -ForegroundColor Green
     uv venv
-    & .venv\Scripts\activate.ps1
     uv pip install -e ".[dev]"
 } else {
-    Write-Host "📦 Using standard Python venv setup..." -ForegroundColor Yellow
+    Write-Host "[*] Using standard Python venv setup..." -ForegroundColor Yellow
     python -m venv .venv
-    & .venv\Scripts\activate.ps1
-    pip install -e ".[dev]"
+    & $VenvPython -m pip install --upgrade pip
+    & $VenvPython -m pip install -e ".[dev]"
 }
 
 # Create .env from template if missing
 if (-not (Test-Path ".env")) {
-    Write-Host "📄 Copying .env from .env.example..." -ForegroundColor Green
+    Write-Host "[*] Copying .env from .env.example..." -ForegroundColor Green
     Copy-Item ".env.example" ".env"
 }
 
@@ -44,7 +45,7 @@ if (-not (Test-Path "models")) {
 
 # Build llama.cpp binaries via CMake
 if (Test-Path "llama.cpp") {
-    Write-Host "🛠️ [2/4] Compiling native llama.cpp binaries (-DGGML_RPC=ON -DGGML_CUDA=ON)..." -ForegroundColor Cyan
+    Write-Host "[2/4] Compiling native llama.cpp binaries (-DGGML_RPC=ON -DGGML_CUDA=ON)..." -ForegroundColor Cyan
     if (-not (Test-Path "llama.cpp\build")) {
         New-Item -ItemType Directory -Path "llama.cpp\build" | Out-Null
     }
@@ -52,14 +53,18 @@ if (Test-Path "llama.cpp") {
     cmake .. -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
     cmake --build . --config Release
     Set-Location $RepoRoot
-    Write-Host "✅ Native llama.cpp build complete!" -ForegroundColor Green
+    Write-Host "[+] Native llama.cpp build complete!" -ForegroundColor Green
 } else {
-    Write-Host "⚠️ Warning: llama.cpp directory missing. Clone submodules with: git submodule update --init --recursive" -ForegroundColor Yellow
+    Write-Host "[!] Warning: llama.cpp directory missing. Clone submodules with: git submodule update --init --recursive" -ForegroundColor Yellow
 }
 
-Write-Host "🚀 [3/4] Initializing AeroMesh CLI..." -ForegroundColor Cyan
-llama-cluster init
+Write-Host "[3/4] Initializing AeroMesh CLI..." -ForegroundColor Cyan
+if (Test-Path $VenvPython) {
+    & $VenvPython -m llama_cluster.cli init
+} else {
+    python -m llama_cluster.cli init
+}
 
 Write-Host ""
-Write-Host "🎉 AeroMesh Windows setup complete! We cookin now fr fr." -ForegroundColor Green
-Write-Host "👉 Run '.venv\Scripts\activate' and then 'aeromesh status' to get started!" -ForegroundColor White
+Write-Host "[+] AeroMesh Windows setup complete!" -ForegroundColor Green
+Write-Host "[>] Run '.venv\Scripts\activate' and then 'aeromesh status' to get started!" -ForegroundColor White
