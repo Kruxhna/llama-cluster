@@ -52,9 +52,9 @@ if (Test-Path "llama.cpp") {
     Set-Location "llama.cpp\build"
     try {
         if (Get-Command "ninja" -ErrorAction SilentlyContinue) {
-            cmake .. -G "Ninja" -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
+            cmake .. -G "Ninja" -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON -DGGML_CUDA=ON
         } else {
-            cmake .. -G "Visual Studio 17 2022" -A x64 -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON
+            cmake .. -G "Visual Studio 17 2022" -A x64 -DLLAMA_BUILD_SERVER=ON -DLLAMA_RPC=ON -DGGML_CUDA=ON
         }
         cmake --build . --config Release
         Write-Host "[+] Native llama.cpp build complete!" -ForegroundColor Green
