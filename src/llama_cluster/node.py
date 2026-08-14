@@ -34,7 +34,7 @@ class NodeDaemon:
         }
 
     def find_rpc_binary(self) -> Optional[Path]:
-        """Looks up llama-rpc-server, ggml-rpc-server, or rpc-server binary in build directories."""
+        """Looks up ggml-rpc-server, llama-rpc-server, or rpc-server binary in build directories."""
         candidates = [
             self.config.llama_cpp_dir / "build" / "bin" / "Release" / "ggml-rpc-server.exe",
             self.config.llama_cpp_dir / "build" / "bin" / "Release" / "llama-rpc-server.exe",

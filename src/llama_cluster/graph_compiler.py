@@ -25,8 +25,8 @@ class DynamicGraphCompiler:
         self,
         nodes_telemetry: List[Dict[str, Any]],
         total_layers: int = 64,
-        layer_weight_mb: float = 270.0,
-        kv_cache_mb: float = 500.0,
+        layer_weight_mb: float = 265.0,
+        kv_cache_mb: float = 300.0,
     ) -> Dict[str, Any]:
         """
         Solves ILP for layer assignment l_i across nodes N minimizing Time-Per-Output-Token (TPOT).

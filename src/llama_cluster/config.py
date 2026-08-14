@@ -109,7 +109,25 @@ class Config:
 
     def get_model_path(self, model_name: Optional[str] = None) -> Path:
         """Returns root-relative path to requested GGUF weight file."""
-        target_name = model_name or self.default_model
+        if model_name:
+            return self.model_dir / model_name
+
+        # Check model_spec in cluster.yaml
+        spec_file = self.topology.get("model_spec", {}).get("file")
+        if spec_file and (self.model_dir / spec_file).exists():
+            return self.model_dir / spec_file
+
+        # Check default_model
+        if (self.model_dir / self.default_model).exists():
+            return self.model_dir / self.default_model
+
+        # Auto-detect existing GGUF models in model_dir
+        if self.model_dir.exists():
+            gguf_files = list(self.model_dir.glob("*.gguf"))
+            if gguf_files:
+                return gguf_files[0]
+
+        target_name = spec_file or self.default_model
         return self.model_dir / target_name
 
 
