@@ -84,7 +84,7 @@ $$S_{\text{mismatch}} = \frac{\|v_{\text{actual}} - v_{\text{ref}}\|_2}{\|v_{\te
 ### 1. Clone with Submodules
 ```bash
 git clone --recursive https://github.com/tex1ure/AeroMesh-vap-2026.git
-cd llama-cluster
+cd AeroMesh-vap-2026
 ```
 
 ### 2. Install & Build
@@ -102,30 +102,52 @@ chmod +x scripts/setup.sh
 
 ---
 
-## Wi-Fi & Firewall Configuration
+## Networking: Same Wi-Fi vs Different Wi-Fi Networks
 
-Because nodes communicate over local TCP sockets, make sure your Wi-Fi network and firewall allow inbound traffic.
+### Scenario A: Laptops on the Same Wi-Fi
 
-### 1. Set Wi-Fi Profile to "Private" (Windows)
-```powershell
-Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private
-```
+1. **Set Wi-Fi Profile to "Private" (Windows)**:
+   ```powershell
+   Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private
+   ```
+2. **Allow Inbound Firewall Ports (Run on each laptop)**:
+   ```powershell
+   # Allow RPC Worker Node (Port 50052)
+   New-NetFirewallRule -DisplayName "AeroMesh RPC Node" -Direction Inbound -LocalPort 50052 -Protocol TCP -Action Allow
 
-### 2. Allow Firewall Inbound Ports
-Run in PowerShell (Admin) on each machine:
-```powershell
-# Allow RPC Worker Node (Port 50052)
-New-NetFirewallRule -DisplayName "AeroMesh RPC Node" -Direction Inbound -LocalPort 50052 -Protocol TCP -Action Allow
+   # Allow Coordinator Master API (Port 8080)
+   New-NetFirewallRule -DisplayName "AeroMesh Master API" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
 
-# Allow Coordinator Master API (Port 8080)
-New-NetFirewallRule -DisplayName "AeroMesh Master API" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+   # Allow ICMP Ping (for latency measurement)
+   New-NetFirewallRule -DisplayName "AeroMesh Allow Ping" -Protocol ICMPv4 -IcmpType 8 -Direction Inbound -Action Allow
+   ```
+3. **Router Client Isolation**: If laptops cannot ping each other on the same Wi-Fi, open your router admin page (`192.168.1.1`) and disable **AP Isolation** / **Client Isolation**.
 
-# Allow ICMP Ping (for network latency measurement)
-New-NetFirewallRule -DisplayName "AeroMesh Allow Ping" -Protocol ICMPv4 -IcmpType 8 -Direction Inbound -Action Allow
-```
+---
 
-### 3. Check Router "AP Isolation"
-If laptops cannot ping each other on the same Wi-Fi network, check your router's web admin page (`192.168.1.1`) and turn **OFF** `AP Isolation` / `Client Isolation`.
+### Scenario B: Laptops on Different Wi-Fi Networks (Tailscale Mesh VPN)
+
+If your laptops are on different Wi-Fi networks (e.g. home vs college dorm vs phone hotspot), they sit behind separate NAT firewalls and cannot reach `192.168.x.x` addresses directly.
+
+**Use Tailscale (Zero-Config WireGuard Mesh VPN):**
+
+1. Install [Tailscale](https://tailscale.com/download) on all laptops (Windows, macOS, Linux).
+2. Sign in with the same account so all machines join your secure virtual network (**Tailnet**).
+3. Find each laptop's virtual Tailscale IP (e.g. `100.x.y.z`):
+   ```bash
+   tailscale ip -4
+   ```
+4. Put the Tailscale IP addresses directly into `config/cluster.yaml`:
+   ```yaml
+   nodes:
+     - name: "Laptop_A"
+       ip: "100.85.12.34"
+       rpc_port: 50052
+     - name: "Laptop_B"
+       ip: "100.85.12.56"
+       rpc_port: 50052
+   ```
+5. Start your nodes and coordinator normally. Tailscale automatically handles encrypted NAT traversal and direct peer-to-peer UDP hole punching across different Wi-Fi networks with zero router port forwarding required.
 
 ---
 
@@ -164,7 +186,7 @@ aeromesh chaos clear --node Laptop_C
 ## Project Structure
 
 ```text
-llama-cluster/
+AeroMesh/
 ├── config/
 │   └── cluster.yaml.example     # 3-Laptop benchmark topology configuration
 ├── models/
@@ -172,6 +194,7 @@ llama-cluster/
 ├── scripts/
 │   ├── setup.ps1                # Windows PowerShell automated setup
 │   ├── setup.sh                 # Linux/macOS bash setup
+│   ├── setup.bat                # Windows CMD setup script
 │   └── run_integration_test.ps1 # Integration test suite
 ├── src/llama_cluster/
 │   ├── canary_validator.py      # Canary Trap tensor validator (L2 distance)
