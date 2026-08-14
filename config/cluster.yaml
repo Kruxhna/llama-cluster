@@ -17,7 +17,7 @@ nodes:
     ip: "100.101.147.24"
     rpc_port: 50052
     gpu_model: "NVIDIA RTX 4060 Mobile"
-    usable_vram_gb: 5.5
+    usable_vram_gb: 2.0
     compute_tflops: 15.0
     is_stable_coordinator: true
 
@@ -35,6 +35,6 @@ nodes:
     ip: "100.122.125.95"
     rpc_port: 50052
     gpu_model: "NVIDIA RTX 3050 Mobile"
-    usable_vram_gb: 3.5
+    usable_vram_gb: 4.8
     compute_tflops: 9.0
     is_stable_coordinator: false
