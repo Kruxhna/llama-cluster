@@ -1,0 +1,40 @@
+[project]
+name = "llama-cluster"
+version = "0.1.0"
+description = "AeroMesh: Topology-aware, fault-tolerant P2P LLM orchestration engine over native llama.cpp RPC"
+readme = "README.md"
+authors = [
+    { name = "Krushna", email = "krushnanole433@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pynvml>=13.0.1",
+    "psutil>=5.9.0",
+    "pulp>=2.8.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.1",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.2.0",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+llama-cluster = "llama_cluster.cli:main"
+aeromesh = "llama_cluster.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

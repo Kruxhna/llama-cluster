@@ -1,0 +1,61 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C/C++ Build outputs & llama.cpp artifacts
+build/
+dist/
+wheels/
+*.egg-info/
+*.so
+*.dylib
+*.dll
+*.exe
+*.o
+*.a
+llama.cpp/build/
+llama.cpp/out/
+
+# GGUF models & weights (never commit huge binaries!)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+!models/.gitkeep
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Testing, linting, & coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Logs & temporary files
+*.log
+logs/
+scratch/
+tmp/
+
+# OS specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE & Editor configs
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
