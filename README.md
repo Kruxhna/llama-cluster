@@ -170,6 +170,99 @@ aeromesh chaos clear --node Laptop_C
 
 ---
 
+## 🌐 Local Wi-Fi & Inter-Node Networking Guide
+
+Because AeroMesh connects laptops over standard consumer Wi-Fi, you must ensure that laptops on your local network are allowed to discover and communicate with each other over TCP sockets.
+
+### 1. Set Windows Wi-Fi Network to "Private"
+By default, Windows sets new Wi-Fi networks to **Public**, which blocks all inbound connections, RPC ports, and local ping discovery.
+
+#### Option A: Via PowerShell (Run as Administrator)
+```powershell
+# Set all connected Wi-Fi interfaces to Private network profile
+Get-NetConnectionProfile | Where-Object {$_.IPv4Connectivity -eq "Internet" -or $_.InterfaceAlias -like "*Wi-Fi*"} | Set-NetConnectionProfile -NetworkCategory Private
+```
+
+#### Option B: Via Windows Settings GUI
+1. Open **Settings** (`Win + I`) -> **Network & Internet** -> **Wi-Fi**.
+2. Click on your active connected Wi-Fi network.
+3. Under **Network profile type**, select **Private network**.
+
+---
+
+### 2. Configure Windows Defender Firewall
+
+Worker nodes (Laptop B & C) must allow inbound traffic on RPC port `50052`, and the coordinator (Laptop A) must allow master API port `8080` and Toxiproxy port `8474`.
+
+#### Option A: Allow Required Inbound Ports (Recommended)
+Run in PowerShell as Administrator on each laptop:
+
+```powershell
+# Allow AeroMesh RPC Worker Node Port
+New-NetFirewallRule -DisplayName "AeroMesh RPC Node (50052)" -Direction Inbound -LocalPort 50052 -Protocol TCP -Action Allow
+
+# Allow AeroMesh Master Coordinator HTTP API Port
+New-NetFirewallRule -DisplayName "AeroMesh Master API (8080)" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+
+# Allow Toxiproxy Chaos Engine Port
+New-NetFirewallRule -DisplayName "AeroMesh Toxiproxy (8474)" -Direction Inbound -LocalPort 8474 -Protocol TCP -Action Allow
+
+# Allow ICMP Ping Requests (For network RTT telemetry & discovery)
+New-NetFirewallRule -DisplayName "AeroMesh Allow ICMP Ping" -Protocol ICMPv4 -IcmpType 8 -Direction Inbound -Action Allow
+```
+
+#### Option B: Temporarily Disable Firewall for Private Network (Quick Testing)
+```powershell
+# Disable firewall ONLY for Private networks (leaves Public networks protected)
+Set-NetFirewallProfile -Profile Private -Enabled False
+```
+
+---
+
+### 3. Check Wi-Fi Router "AP Isolation" (Client Isolation)
+Many consumer Wi-Fi routers and mobile hotspots enable **AP Isolation** (also called *Client Isolation* or *Station Isolation*) by default. This prevents connected devices on the same Wi-Fi network from communicating with one another.
+
+* **Fix**: Log into your router's admin panel (usually `http://192.168.1.1` or `http://192.168.0.1`) -> **Wireless Settings** -> **Advanced** -> Turn **AP Isolation / Client Isolation** to **OFF** / **Disabled**.
+* *Alternative*: Connect all laptops to an unmanaged gigabit Ethernet switch or a phone hotspot with client sharing enabled.
+
+---
+
+### 4. Verify Inter-Node Connectivity
+
+Find each laptop's local IPv4 address:
+- **Windows**: `ipconfig` (look for `IPv4 Address` under Wireless LAN adapter Wi-Fi)
+- **Linux**: `ip -br a`
+- **macOS**: `ipconfig getifaddr en0`
+
+Test if Laptop A can connect to Laptop B's RPC port:
+```powershell
+# Test TCP socket connection on port 50052
+Test-NetConnection -ComputerName 192.168.1.102 -Port 50052
+
+# Test ICMP ping
+ping 192.168.1.102
+```
+
+---
+
+### 5. Linux (UFW) & macOS Firewall Setup
+
+#### Linux (Ubuntu/Debian):
+```bash
+# Allow RPC port and Master API
+sudo ufw allow 50052/tcp comment "AeroMesh RPC Node"
+sudo ufw allow 8080/tcp comment "AeroMesh Master API"
+sudo ufw reload
+```
+
+#### macOS:
+If the macOS Application Firewall is enabled:
+1. Open **System Settings** -> **Network** -> **Firewall**.
+2. Click **Options...** and ensure **Block all incoming connections** is **OFF**.
+3. Allow `llama-server` and `Python` when prompted.
+
+---
+
 ## 📂 Repository Structure
 
 ```text
