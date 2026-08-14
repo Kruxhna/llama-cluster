@@ -7,7 +7,13 @@ Generates 200ms JSON telemetry payloads per AeroMesh Specification Section 6.2.
 import time
 import sys
 import socket
-from typing import Dict, Any, Optional
+import warnings
+from typing import Dict, Any, Optional, List
+
+# Suppress pynvml deprecation warning
+warnings.filterwarnings("ignore", message=".*pynvml.*", category=FutureWarning)
+warnings.filterwarnings("ignore", category=FutureWarning, module="pynvml.*")
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 try:
     import psutil
@@ -35,6 +41,72 @@ class TelemetryCollector:
             except Exception:
                 # Defensive fallback for non-NVIDIA or missing driver nodes
                 self.nvml_initialized = False
+
+    def get_gpu_stats(self) -> List[Dict[str, Any]]:
+        """Returns detailed GPU stats across available GPUs or CPU fallback."""
+        stats = []
+        if self.nvml_initialized:
+            try:
+                device_count = pynvml.nvmlDeviceGetCount()
+                for i in range(device_count):
+                    handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                    raw_name = pynvml.nvmlDeviceGetName(handle)
+                    name = raw_name if isinstance(raw_name, str) else raw_name.decode("utf-8", errors="replace")
+                    mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+                    vram_total_mb = round(mem.total / (1024 * 1024), 1)
+                    vram_used_mb = round(mem.used / (1024 * 1024), 1)
+                    vram_free_mb = round(mem.free / (1024 * 1024), 1)
+                    vram_util_pct = round((mem.used / mem.total) * 100.0, 1) if mem.total > 0 else 0.0
+
+                    try:
+                        temp = float(pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU))
+                    except Exception:
+                        temp = 0.0
+
+                    try:
+                        power = float(pynvml.nvmlDeviceGetPowerUsage(handle)) / 1000.0
+                    except Exception:
+                        power = 0.0
+
+                    stats.append({
+                        "index": i,
+                        "name": name,
+                        "vram_total_mb": vram_total_mb,
+                        "vram_used_mb": vram_used_mb,
+                        "vram_free_mb": vram_free_mb,
+                        "vram_utilization_percent": vram_util_pct,
+                        "temp_celsius": temp,
+                        "power_watts": power,
+                    })
+            except Exception:
+                pass
+
+        if not stats:
+            # Fallback to system RAM if NVML unavailable
+            ram_total_mb = 0.0
+            ram_used_mb = 0.0
+            ram_util_pct = 0.0
+            if HAS_PSUTIL:
+                try:
+                    vm = psutil.virtual_memory()
+                    ram_total_mb = round(vm.total / (1024 * 1024), 1)
+                    ram_used_mb = round(vm.used / (1024 * 1024), 1)
+                    ram_util_pct = round(vm.percent, 1)
+                except Exception:
+                    pass
+            stats.append({
+                "index": 0,
+                "name": "Host System Memory (CPU Fallback)",
+                "vram_total_mb": ram_total_mb,
+                "vram_used_mb": ram_used_mb,
+                "vram_free_mb": round(ram_total_mb - ram_used_mb, 1),
+                "vram_utilization_percent": ram_util_pct,
+                "temp_celsius": 0.0,
+                "power_watts": 0.0,
+            })
+
+        return stats
 
     def measure_network_rtt(self, target_host: str, port: int = 8080, timeout: float = 1.0) -> float:
         """Measures network RTT latency to target host in milliseconds."""

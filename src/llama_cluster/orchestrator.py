@@ -21,7 +21,11 @@ class AeroMeshOrchestrator:
 
     def __init__(self, cfg: Optional[Config] = None):
         self.config = cfg or get_config()
-        self.telemetry = get_telemetry("Laptop_A_Coordinator")
+        nodes = self.config.topology.get("nodes", [])
+        coord_node = next((n for n in nodes if n.get("is_stable_coordinator")), None)
+        coord_cfg = self.config.topology.get("coordinator", {})
+        self.coord_name = (coord_node.get("name") if coord_node else None) or coord_cfg.get("node_id", "Laptop_A")
+        self.telemetry = get_telemetry(self.coord_name)
         self.compiler = DynamicGraphCompiler(self.config)
         self.validator = ByzantineTensorValidator(self.config)
         self.server_process: Optional[subprocess.Popen] = None
@@ -32,15 +36,19 @@ class AeroMeshOrchestrator:
         nodes = self.config.topology.get("nodes", [])
         collected = []
 
+        coord_node = next((n for n in nodes if n.get("is_stable_coordinator")), None)
+        coord_name = (coord_node.get("name") if coord_node else None) or self.coord_name
+
         # Local Coordinator (Laptop A) Telemetry
         local_payload = self.telemetry.get_telemetry_payload("127.0.0.1")
-        local_payload["compute_tflops"] = 15.0
+        local_payload["node_id"] = coord_name
+        local_payload["compute_tflops"] = coord_node.get("compute_tflops", 15.0) if coord_node else 15.0
         collected.append(local_payload)
 
         # Remote Workers (Laptop B, Laptop C) Telemetry Simulation/Fetch
         for n in nodes:
             name = n.get("name", "Worker_Node")
-            if name in ("Laptop_A", "Laptop_A_Coordinator", local_payload["node_id"]):
+            if name == coord_name or n.get("is_stable_coordinator", False):
                 continue
 
             ip = n.get("ip", "127.0.0.1")
@@ -82,6 +90,7 @@ class AeroMeshOrchestrator:
     def find_server_binary(self) -> Optional[Path]:
         """Looks up native llama-server binary in build output directories."""
         candidates = [
+            self.config.llama_cpp_dir / "build" / "bin" / "Release" / "llama-server.exe",
             self.config.llama_cpp_dir / "build" / "bin" / "llama-server",
             self.config.llama_cpp_dir / "build" / "bin" / "llama-server.exe",
             self.config.llama_cpp_dir / "llama-server",
@@ -116,7 +125,7 @@ class AeroMeshOrchestrator:
         rpc_targets = []
         for n in nodes:
             name = n.get("name", "")
-            if name in rebalance["active_nodes"]:
+            if not n.get("is_stable_coordinator") and name in rebalance["active_nodes"]:
                 ip = n.get("ip", "127.0.0.1")
                 rpc_port = n.get("rpc_port", 50052)
                 rpc_targets.append(f"{ip}:{rpc_port}")
