@@ -1,49 +1,31 @@
-# ==============================================================================
-# AeroMesh Cluster Topology & Allocation Profile (3-Laptop Mismatched Hardware Benchmark)
-# Specification Reference: Section 2.1 Cluster Allocation
-# ==============================================================================
-
-cluster_name: "aeromesh-3-laptop-mismatched-cluster"
+cluster_name: "aeromesh-2-laptop-tailscale-cluster"
 
 coordinator:
   node_id: "Laptop_A_Coordinator"
-  host: "127.0.0.1"
+  host: "100.101.147.24"
   control_port: 8080
 
 model_spec:
-  name: "Qwen2.5-32B-Instruct"
-  file: "Qwen2.5-32B-Instruct-Q4_K_M.gguf"
-  repo: "Qwen/Qwen2.5-32B-Instruct-GGUF"
-  total_layers: 64
+  name: "Qwen2.5-14B-Instruct"
+  file: "Qwen2.5-14B-Instruct-Q4_K_M.gguf"
+  total_layers: 48
   context_length: 2048
 
 nodes:
   - name: "Laptop_A"
     role: "Coordinator & Stable Worker"
-    ip: "127.0.0.1"
+    ip: "100.101.147.24"
     rpc_port: 50052
     gpu_model: "NVIDIA RTX 4060 Mobile"
-    total_vram_gb: 8.0
     usable_vram_gb: 7.5
     compute_tflops: 15.0
     is_stable_coordinator: true
 
   - name: "Laptop_B"
     role: "Primary Execution Worker"
-    ip: "192.168.1.102"
+    ip: "100.66.49.50"
     rpc_port: 50052
     gpu_model: "NVIDIA RTX 4060 Mobile"
-    total_vram_gb: 8.0
     usable_vram_gb: 7.5
     compute_tflops: 15.0
-    is_stable_coordinator: false
-
-  - name: "Laptop_C"
-    role: "Structural Bottleneck & Demo Hook"
-    ip: "192.168.1.103"
-    rpc_port: 50052
-    gpu_model: "NVIDIA RTX 3050 Mobile"
-    total_vram_gb: 4.0
-    usable_vram_gb: 3.5
-    compute_tflops: 9.0
     is_stable_coordinator: false
