@@ -97,13 +97,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def send_json(self, data: Any, status: int = 200):
         """Helper to send JSON response with CORS headers."""
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, indent=2).encode("utf-8"))
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.end_headers()
+            self.wfile.write(json.dumps(data, indent=2).encode("utf-8"))
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
+        except Exception:
+            pass
 
     def handle_get_cluster(self):
         """Returns full cluster configuration, current layer allocations, and model spec."""
