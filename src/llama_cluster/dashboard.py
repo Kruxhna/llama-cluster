@@ -33,8 +33,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Suppress noisy default static file request logging."""
-        if "/api/" in (args[0] if args else ""):
-            super().log_message(format, *args)
+        try:
+            msg = format % args if args else str(format)
+            if "/api/" in str(msg):
+                super().log_message(format, *args)
+        except Exception:
+            pass
+
+    def do_OPTIONS(self):
+        """Handles CORS pre-flight requests."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -210,26 +222,29 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def handle_post_config_update(self, payload: Dict[str, Any]):
         """Updates and persists cluster.yaml."""
-        cfg = get_config()
-        config_path = cfg.config_file
-        
-        if not config_path.exists():
-            config_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            cfg = get_config()
+            config_path = cfg.config_path
+            
+            if not config_path.exists():
+                config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        current_data = cfg.topology
-        if "cluster_name" in payload:
-            current_data["cluster_name"] = payload["cluster_name"]
-        if "coordinator" in payload:
-            current_data["coordinator"] = payload["coordinator"]
-        if "model_spec" in payload:
-            current_data["model_spec"] = payload["model_spec"]
-        if "nodes" in payload:
-            current_data["nodes"] = payload["nodes"]
+            current_data = cfg.topology or {}
+            if "cluster_name" in payload:
+                current_data["cluster_name"] = payload["cluster_name"]
+            if "coordinator" in payload:
+                current_data["coordinator"] = payload["coordinator"]
+            if "model_spec" in payload:
+                current_data["model_spec"] = payload["model_spec"]
+            if "nodes" in payload:
+                current_data["nodes"] = payload["nodes"]
 
-        with open(config_path, "w", encoding="utf-8") as f:
-            yaml.dump(current_data, f, sort_keys=False, default_flow_style=False)
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(current_data, f, sort_keys=False, default_flow_style=False)
 
-        self.send_json({"status": "Saved", "topology": current_data})
+            self.send_json({"status": "Saved", "topology": current_data})
+        except Exception as e:
+            self.send_json({"error": f"Failed to save configuration: {e}"}, status=500)
 
     def handle_post_cluster_start(self, payload: Dict[str, Any]):
         """Starts the coordinator llama-server."""
@@ -272,6 +287,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self.send_json(resp_json)
         except Exception as e:
             self.send_json({"error": f"Coordinator offline or request failed: {e}"}, status=502)
+
+
+def start_dashboard_background(host: str = "0.0.0.0", port: int = 3000) -> Optional[HTTPServer]:
+    """Starts the AeroMesh Web Control Dashboard HTTP server in a background daemon thread."""
+    try:
+        server_address = (host, port)
+        httpd = HTTPServer(server_address, DashboardRequestHandler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        print(f"[+] Web Control Dashboard Live : http://localhost:{port}")
+        return httpd
+    except Exception as e:
+        print(f"[!] Warning: Could not bind Web Dashboard on port {port}: {e}")
+        return None
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 3000):
