@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroMesh Control Plane | Distributed LLM Mesh</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background-glow"></div>
+  <div class="grid-overlay"></div>
+
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-badge">
+        <span class="logo-icon">⚡</span>
+        <div class="logo-text">
+          <h1>AEROMESH</h1>
+          <span class="version-tag">v0.1.0 • P2P Orchestration Engine</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="cluster-quick-stats">
+        <div class="stat-pill">
+          <span class="pill-label">MODEL</span>
+          <span class="pill-value" id="headerModelName">Loading...</span>
+        </div>
+        <div class="stat-pill">
+          <span class="pill-label">MESH VRAM</span>
+          <span class="pill-value" id="headerTotalVram">-- GB</span>
+        </div>
+        <div class="stat-pill">
+          <span class="pill-label">TOPOLOGY</span>
+          <span class="pill-value" id="headerActiveNodes">-- Nodes</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="status-indicator">
+        <span class="pulse-dot" id="clusterPulse"></span>
+        <span class="status-text" id="clusterStatusText">Mesh Active</span>
+      </div>
+      <button class="btn btn-primary" id="btnQuickStart">
+        <span>🚀</span> Start Cluster
+      </button>
+      <button class="btn btn-secondary" id="btnOpenConfig">
+        <span>⚙️</span> Topology Config
+      </button>
+    </div>
+  </header>
+
+  <main class="dashboard-container">
+    <!-- Top Row: Node Telemetry Cards -->
+    <section class="section-nodes">
+      <div class="section-header">
+        <div>
+          <h2>Cluster Node Topology & 200ms Telemetry</h2>
+          <p class="section-desc">Live hardware stream, Tailscale mesh latency, and GPU VRAM utilization</p>
+        </div>
+        <div class="telemetry-badge">
+          <span class="telemetry-dot"></span>
+          <span>Streaming NVML & Ping (200ms)</span>
+        </div>
+      </div>
+
+      <div class="node-cards-grid" id="nodeCardsGrid">
+        <!-- Dynamically rendered node cards -->
+        <div class="card card-loading">Connecting to AeroMesh Mesh...</div>
+      </div>
+    </section>
+
+    <!-- Middle Row: Dynamic Layer Slicer & Pipeline Ring -->
+    <section class="section-layers">
+      <div class="section-header">
+        <div>
+          <h2>Dynamic Graph Compiler & Layer Partition</h2>
+          <p class="section-desc">Drag sliders to adjust layer slices in real-time or auto-tune with PuLP ILP solver</p>
+        </div>
+        <div class="actions-group">
+          <button class="btn btn-outline" id="btnAutoBalance">
+            <span>🧠</span> Auto-Balance (PuLP ILP)
+          </button>
+          <button class="btn btn-accent" id="btnApplyLayers">
+            <span>💾</span> Apply Layer Slices
+          </button>
+        </div>
+      </div>
+
+      <div class="card layers-container">
+        <!-- Visual Layer Progress Bar -->
+        <div class="layer-bar-wrapper">
+          <div class="layer-bar-header">
+            <span>Total Model Layers: <strong id="totalLayersCount">48</strong></span>
+            <span>Allocated: <strong id="allocatedLayersCount" class="text-cyan">48</strong> / <span id="maxLayersBudget">48</span></span>
+          </div>
+          <div class="layer-bar-segments" id="layerBarSegments">
+            <!-- Rendered layer segments -->
+          </div>
+        </div>
+
+        <!-- Node Sliders Grid -->
+        <div class="node-sliders-grid" id="nodeSlidersGrid">
+          <!-- Rendered range sliders per node -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Row: 2-Column (Topology Settings & Live Inference Chat) -->
+    <div class="bottom-grid">
+      <!-- Left Column: Cluster Settings & Node Editor -->
+      <section class="section-config">
+        <div class="section-header">
+          <div>
+            <h2>Mesh Settings & Roles</h2>
+            <p class="section-desc">Elect coordinator host, switch models, and configure node IPs</p>
+          </div>
+        </div>
+
+        <div class="card config-card">
+          <form id="clusterConfigForm">
+            <div class="form-group">
+              <label for="cfgClusterName">Cluster Mesh Name</label>
+              <input type="text" id="cfgClusterName" class="form-input" value="aeromesh-tailscale-mesh">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfgCoordinatorSelect">Coordinator Node</label>
+                <select id="cfgCoordinatorSelect" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label for="cfgModelSelect">Active Model</label>
+                <select id="cfgModelSelect" class="form-select"></select>
+              </div>
+            </div>
+
+            <div class="node-list-manager">
+              <div class="node-list-header">
+                <h3>Registered Nodes</h3>
+                <button type="button" class="btn btn-xs btn-outline" id="btnAddNodeModal">
+                  <span>+</span> Add Node
+                </button>
+              </div>
+              <div class="node-table-wrapper">
+                <table class="node-table">
+                  <thead>
+                    <tr>
+                      <th>Node Name</th>
+                      <th>Tailscale IP</th>
+                      <th>Port</th>
+                      <th>Usable VRAM</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="nodeTableBody">
+                    <!-- Rendered nodes -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="btnSaveConfig">
+                <span>💾</span> Save Configuration (cluster.yaml)
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Right Column: Live Chat & Benchmarking Console -->
+      <section class="section-chat">
+        <div class="section-header">
+          <div>
+            <h2>Distributed Inference Test Console</h2>
+            <p class="section-desc">Benchmark generation speed (tok/sec) across the multi-laptop cluster</p>
+          </div>
+        </div>
+
+        <div class="card chat-card">
+          <div class="chat-metrics-bar">
+            <div class="chat-stat">
+              <span>Status:</span>
+              <strong id="inferenceStatus" class="text-green">Ready</strong>
+            </div>
+            <div class="chat-stat">
+              <span>Speed:</span>
+              <strong id="inferenceSpeed" class="text-cyan">-- tok/s</strong>
+            </div>
+            <div class="chat-stat">
+              <span>Latency:</span>
+              <strong id="inferenceLatency" class="text-purple">-- ms</strong>
+            </div>
+          </div>
+
+          <div class="chat-messages-container" id="chatMessages">
+            <div class="chat-msg msg-system">
+              <div class="msg-author">AeroMesh System</div>
+              <div class="msg-content">
+                Welcome to the AeroMesh Distributed Inference Console. Type a prompt below to verify token generation across your laptop cluster.
+              </div>
+            </div>
+          </div>
+
+          <form id="chatForm" class="chat-input-row">
+            <input type="text" id="chatInput" class="form-input chat-input" placeholder="Type a prompt (e.g. Explain quantum computing in 2 sentences)..." autocomplete="off" required>
+            <button type="submit" class="btn btn-accent chat-send-btn" id="btnSendChat">
+              <span>Send</span> ⚡
+            </button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Add / Edit Node Modal -->
+  <div class="modal-backdrop" id="nodeModal">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add New Cluster Node</h3>
+        <button class="modal-close" id="btnCloseModal">&times;</button>
+      </div>
+      <form id="modalNodeForm">
+        <div class="form-group">
+          <label for="modalNodeName">Node Identifier</label>
+          <input type="text" id="modalNodeName" class="form-input" placeholder="Laptop_D" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="modalNodeIp">Tailscale / LAN IP</label>
+            <input type="text" id="modalNodeIp" class="form-input" placeholder="100.x.y.z" required>
+          </div>
+          <div class="form-group">
+            <label for="modalNodePort">RPC Port</label>
+            <input type="number" id="modalNodePort" class="form-input" value="50052" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="modalNodeGpu">GPU Model</label>
+            <input type="text" id="modalNodeGpu" class="form-input" placeholder="NVIDIA RTX 4060 Mobile" value="NVIDIA GPU">
+          </div>
+          <div class="form-group">
+            <label for="modalNodeVram">Usable VRAM (GB)</label>
+            <input type="number" step="0.5" id="modalNodeVram" class="form-input" value="7.5" required>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelModal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveModalNode">Save Node</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

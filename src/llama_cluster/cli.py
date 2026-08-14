@@ -173,6 +173,12 @@ def cmd_init(args: argparse.Namespace):
     print("[+] AeroMesh environment initialization complete. We ready to cook!")
 
 
+def cmd_dashboard(args: argparse.Namespace):
+    show_banner()
+    from llama_cluster.dashboard import run_dashboard
+    run_dashboard(host=args.host, port=args.port)
+
+
 def main(argv: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         prog="aeromesh",
@@ -181,6 +187,12 @@ def main(argv: Optional[List[str]] = None):
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", help="AeroMesh subcommands")
+
+    # Dashboard
+    parser_dashboard = subparsers.add_parser("dashboard", help="Start Web Control Dashboard & Topology Manager")
+    parser_dashboard.add_argument("--host", default="0.0.0.0", help="Binding host (default: 0.0.0.0)")
+    parser_dashboard.add_argument("-p", "--port", type=int, default=3000, help="Dashboard web port (default: 3000)")
+    parser_dashboard.set_defaults(func=cmd_dashboard)
 
     # Status
     parser_status = subparsers.add_parser("status", help="Show 200ms telemetry, VRAM, and model status")
