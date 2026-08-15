@@ -4,6 +4,13 @@ use anyhow::{bail, Context, Result};
 use tracing::{error, info};
 use crate::job_object::SafeProcessJob;
 
+#[derive(Debug, Clone)]
+pub struct InferenceResult {
+    pub output_text: String,
+    pub rpc_devices_detected: Vec<String>,
+    pub performance_summary: Vec<String>,
+}
+
 pub struct EngineSupervisor {
     bin_dir: PathBuf,
     job: SafeProcessJob,
@@ -59,7 +66,7 @@ impl EngineSupervisor {
         peers: &[String],
         n_gpu_layers: i32,
         prompt: &str,
-    ) -> Result<String> {
+    ) -> Result<InferenceResult> {
         // Resolve absolute model path so working directory does not break file access
         let abs_model_path = if model_path.is_absolute() {
             model_path.to_path_buf()
@@ -117,7 +124,27 @@ impl EngineSupervisor {
             bail!("llama execution failed with status: {}", output.status);
         }
 
-        Ok(stdout_str)
+        // Parse stderr to extract cluster offloading breakdown and performance metrics
+        let mut rpc_devices = Vec::new();
+        let mut perf_metrics = Vec::new();
+
+        for line in stderr_str.lines() {
+            let trimmed = line.trim();
+            if trimmed.contains("RPC") || trimmed.contains("CUDA") || trimmed.contains("offload") || trimmed.contains("device") || trimmed.contains("remote") || trimmed.contains("backend") {
+                if !trimmed.contains("DEBUG") && !trimmed.is_empty() {
+                    rpc_devices.push(trimmed.to_string());
+                }
+            }
+            if trimmed.contains("eval time") || trimmed.contains("prompt eval time") || trimmed.contains("total time") || trimmed.contains("tokens per second") {
+                perf_metrics.push(trimmed.to_string());
+            }
+        }
+
+        Ok(InferenceResult {
+            output_text: stdout_str,
+            rpc_devices_detected: rpc_devices,
+            performance_summary: perf_metrics,
+        })
     }
 
     pub fn shutdown_all(&mut self) {

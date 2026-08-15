@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -15,9 +15,52 @@ pub struct GgufMetadata {
     pub fast_checksum: String,
 }
 
+pub fn resolve_model_path<P: AsRef<Path>>(input_path: Option<P>) -> Result<PathBuf> {
+    if let Some(p) = input_path {
+        let path = p.as_ref();
+        if path.exists() {
+            return Ok(path.to_path_buf());
+        }
+
+        // Try with .gguf extension appended
+        let with_gguf = path.with_extension("gguf");
+        if with_gguf.exists() {
+            return Ok(with_gguf);
+        }
+
+        // Try inside models/ folder
+        let in_models = Path::new("models").join(path);
+        if in_models.exists() {
+            return Ok(in_models);
+        }
+
+        let in_models_gguf = Path::new("models").join(&with_gguf);
+        if in_models_gguf.exists() {
+            return Ok(in_models_gguf);
+        }
+
+        bail!("Could not find model file at {:?} (also checked .gguf extension and models/ directory)", path);
+    }
+
+    // Auto-discover first .gguf in models/ folder
+    let models_dir = Path::new("models");
+    if models_dir.exists() {
+        for entry in std::fs::read_dir(models_dir)? {
+            let entry = entry?;
+            let p = entry.path();
+            if p.is_file() && p.extension().map_or(false, |ext| ext == "gguf") {
+                info!(found = %p.display(), "Auto-discovered model in models/ folder");
+                return Ok(p);
+            }
+        }
+    }
+
+    bail!("No model specified and no .gguf models found in models/ directory");
+}
+
 pub fn inspect_gguf_file<P: AsRef<Path>>(path: P) -> Result<GgufMetadata> {
-    let path_ref = path.as_ref();
-    let mut file = File::open(path_ref).context("Failed to open GGUF model file")?;
+    let resolved = resolve_model_path(Some(path))?;
+    let mut file = File::open(&resolved).context(format!("Failed to open GGUF model file at {:?}", resolved))?;
     let file_size_bytes = file.metadata()?.len();
 
     let mut magic = [0u8; 4];
@@ -49,7 +92,7 @@ pub fn inspect_gguf_file<P: AsRef<Path>>(path: P) -> Result<GgufMetadata> {
     let fast_checksum = hex::encode(&hasher.finalize()[..8]);
 
     info!(
-        path = %path_ref.display(),
+        path = %resolved.display(),
         version = version,
         tensors = tensor_count,
         kv_pairs = kv_count,
@@ -59,7 +102,7 @@ pub fn inspect_gguf_file<P: AsRef<Path>>(path: P) -> Result<GgufMetadata> {
     );
 
     Ok(GgufMetadata {
-        file_path: path_ref.to_string_lossy().to_string(),
+        file_path: resolved.to_string_lossy().to_string(),
         version,
         tensor_count,
         kv_count,

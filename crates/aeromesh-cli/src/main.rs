@@ -6,7 +6,7 @@ use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use aeromesh_core::tailscale::TailscaleInspector;
-use aeromesh_engine::{inspect_gguf_file, EngineSupervisor};
+use aeromesh_engine::{inspect_gguf_file, resolve_model_path, EngineSupervisor};
 
 #[derive(Parser, Debug)]
 #[command(name = "aeromesh")]
@@ -20,9 +20,9 @@ struct Cli {
 enum Commands {
     /// Verify GGUF model headers, layer count, and cross-node hash integrity
     ModelCheck {
-        /// Path to the .gguf model file
+        /// Path to the .gguf model file (optional, auto-discovers if omitted)
         #[arg(value_name = "FILE")]
-        path: PathBuf,
+        path: Option<PathBuf>,
     },
 
     /// Probe Tailscale link quality (Direct WireGuard vs DERP, RTT latency)
@@ -45,9 +45,9 @@ enum Commands {
 
     /// Run the multi-node cluster coordinator
     Coordinator {
-        /// Path to GGUF model file
+        /// Path to GGUF model file (e.g. models/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf)
         #[arg(long)]
-        model: PathBuf,
+        model: Option<PathBuf>,
 
         /// Comma-separated list of remote RPC peer addresses (e.g. 100.122.125.95:50052)
         #[arg(long)]
@@ -58,7 +58,7 @@ enum Commands {
         ngl: i32,
 
         /// Prompt text to execute
-        #[arg(long, default_value = "Write a short sentence about GPU clusters.")]
+        #[arg(long, default_value = "Write a short sentence about distributed GPU clusters.")]
         prompt: String,
     },
 }
@@ -75,8 +75,9 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::ModelCheck { path } => {
-            info!("🔍 Inspecting GGUF model integrity at {:?}", path);
-            let meta = inspect_gguf_file(&path)?;
+            let model_path = resolve_model_path(path.as_ref())?;
+            info!("🔍 Inspecting GGUF model integrity at {:?}", model_path);
+            let meta = inspect_gguf_file(&model_path)?;
             println!("\n========================================================");
             println!("   AEROMESH GGUF MODEL INTEGRITY REPORT");
             println!("========================================================");
@@ -118,6 +119,7 @@ async fn main() -> Result<()> {
             println!("========================================================");
             println!("  Bound Address:  {}:{}", host, port);
             println!("  Protection:     Windows Job Object Active (Leak-Proof VRAM)");
+            println!("  Status:         Listening for Coordinator Tensor Offloads...");
             println!("  Press Ctrl+C to terminate worker safely.");
             println!("========================================================\n");
 
@@ -137,10 +139,11 @@ async fn main() -> Result<()> {
             println!("========================================================");
 
             // Step 1: Check model
-            info!("Step 1/3: Verifying local model file...");
-            let meta = inspect_gguf_file(&model)?;
+            info!("Step 1/3: Verifying model file...");
+            let model_path = resolve_model_path(model.as_ref())?;
+            let meta = inspect_gguf_file(&model_path)?;
             info!(
-                model = %model.display(),
+                model = %model_path.display(),
                 tensors = meta.tensor_count,
                 checksum = %meta.fast_checksum,
                 "Model integrity confirmed"
@@ -152,7 +155,7 @@ async fn main() -> Result<()> {
                 .map(|p| p.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default();
 
-            let mut valid_peers = Vec::new();
+            let mut approved_peers = Vec::new();
             if !peer_list.is_empty() {
                 info!("Step 2/3: Probing Tailscale peer quality for {} nodes...", peer_list.len());
                 for peer in &peer_list {
@@ -160,7 +163,7 @@ async fn main() -> Result<()> {
                         match TailscaleInspector::probe_socket_link(addr).await {
                             Ok(quality) => {
                                 if quality.is_acceptable {
-                                    valid_peers.push(peer.clone());
+                                    approved_peers.push((peer.clone(), quality.tcp_rtt_ms));
                                     info!(peer = %peer, rtt_ms = quality.tcp_rtt_ms, "Peer approved for cluster");
                                 } else {
                                     warn!(
@@ -183,16 +186,39 @@ async fn main() -> Result<()> {
                 info!("No remote peers configured. Running on local node.");
             }
 
+            println!("\n========================================================");
+            println!("   CLUSTER TOPOLOGY & PIPELINE ASSIGNMENT");
+            println!("========================================================");
+            println!("  [Node 1] Local Machine (Coordinator GPU): ACTIVE");
+            if approved_peers.is_empty() {
+                println!("  [Remote] No approved remote RPC workers active (running standalone)");
+            } else {
+                for (idx, (peer_addr, rtt)) in approved_peers.iter().enumerate() {
+                    println!("  [Node {}] Remote Worker ({}) - RTT: {:.1}ms [OFFLOAD ACTIVE]", idx + 2, peer_addr, rtt);
+                }
+            }
+            println!("========================================================\n");
+
             // Step 3: Launch inference execution
             info!("Step 3/3: Dispatching prompt across active cluster pipeline...");
+            let active_peer_addrs: Vec<String> = approved_peers.iter().map(|(p, _)| p.clone()).collect();
             let mut supervisor = EngineSupervisor::new(&current_dir)?;
-            let result = supervisor.run_completion(&model, &valid_peers, ngl, &prompt)?;
+            let result = supervisor.run_completion(&model_path, &active_peer_addrs, ngl, &prompt)?;
 
             println!("\n========================================================");
             println!("   AEROMESH INFERENCE GENERATION OUTPUT");
             println!("========================================================");
-            println!("{}", result.trim());
-            println!("========================================================\n");
+            println!("{}", result.output_text.trim());
+            println!("========================================================");
+
+            if !result.performance_summary.is_empty() {
+                println!("\n--- CLUSTER PERFORMANCE METRICS ---");
+                for metric in &result.performance_summary {
+                    println!("  {}", metric);
+                }
+                println!("------------------------------------\n");
+            }
+
             info!("🎉 Multi-node token generation completed successfully!");
         }
     }
