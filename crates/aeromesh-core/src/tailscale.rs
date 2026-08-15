@@ -43,6 +43,19 @@ pub struct PeerLinkQuality {
     pub is_acceptable: bool, // true if direct or RTT <= 150ms
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveredNodeStatus {
+    pub host_name: String,
+    pub ip: String,
+    pub is_self: bool,
+    pub is_tailscale_active: bool,
+    pub is_direct_wireguard: bool,
+    pub relay_region: Option<String>,
+    pub rpc_online: bool,
+    pub rtt_ms: Option<f64>,
+    pub cluster_ready: bool,
+}
+
 pub struct TailscaleInspector;
 
 impl TailscaleInspector {
@@ -127,5 +140,76 @@ impl TailscaleInspector {
             tcp_rtt_ms: rtt_ms,
             is_acceptable,
         })
+    }
+
+    pub async fn discover_cluster_nodes(port: u16) -> Result<Vec<DiscoveredNodeStatus>> {
+        let status = Self::get_status()?;
+        let mut nodes = Vec::new();
+
+        // 1. Check self node
+        if let Some(self_node) = status.self_node {
+            let self_ip = self_node.tailscale_ips.first().cloned().unwrap_or_else(|| "127.0.0.1".into());
+            let socket: SocketAddr = format!("{}:{}", self_ip, port).parse().unwrap_or_else(|_| "127.0.0.1:50052".parse().unwrap());
+            let rpc_online = tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(socket)).await.is_ok();
+
+            nodes.push(DiscoveredNodeStatus {
+                host_name: format!("{} (Coordinator)", self_node.host_name),
+                ip: self_ip,
+                is_self: true,
+                is_tailscale_active: true,
+                is_direct_wireguard: true,
+                relay_region: None,
+                rpc_online,
+                rtt_ms: Some(0.5),
+                cluster_ready: true,
+            });
+        }
+
+        // 2. Check peer nodes
+        if let Some(peers) = status.peer {
+            for (_id, peer) in peers {
+                if let Some(ip) = peer.tailscale_ips.first() {
+                    let addr_str = format!("{}:{}", ip, port);
+                    let mut is_direct = true;
+                    let mut relay_region = None;
+
+                    if let Some(relay) = &peer.relay {
+                        if peer.cur_addr.is_none() {
+                            is_direct = false;
+                            relay_region = Some(relay.clone());
+                        }
+                    }
+
+                    let active = peer.active.unwrap_or(false);
+                    let mut rpc_online = false;
+                    let mut rtt_ms = None;
+
+                    if let Ok(addr) = addr_str.parse::<SocketAddr>() {
+                        let start = Instant::now();
+                        if let Ok(Ok(stream)) = tokio::time::timeout(Duration::from_millis(1500), TcpStream::connect(addr)).await {
+                            let _ = stream.set_nodelay(true);
+                            rpc_online = true;
+                            rtt_ms = Some((start.elapsed().as_micros() as f64) / 1000.0);
+                        }
+                    }
+
+                    let cluster_ready = rpc_online && is_direct && rtt_ms.map_or(false, |r| r <= 150.0);
+
+                    nodes.push(DiscoveredNodeStatus {
+                        host_name: peer.host_name,
+                        ip: ip.clone(),
+                        is_self: false,
+                        is_tailscale_active: active,
+                        is_direct_wireguard: is_direct,
+                        relay_region,
+                        rpc_online,
+                        rtt_ms,
+                        cluster_ready,
+                    });
+                }
+            }
+        }
+
+        Ok(nodes)
     }
 }

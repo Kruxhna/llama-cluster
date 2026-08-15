@@ -18,6 +18,13 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// View real-time cluster connectivity and node status over Tailscale
+    Status {
+        /// RPC Port to check on worker nodes
+        #[arg(long, default_value_t = 50052)]
+        port: u16,
+    },
+
     /// Verify GGUF model headers, layer count, and cross-node hash integrity
     ModelCheck {
         /// Path to the .gguf model file (optional, auto-discovers if omitted)
@@ -74,6 +81,55 @@ async fn main() -> Result<()> {
     let current_dir = std::env::current_dir()?;
 
     match cli.command {
+        Commands::Status { port } => {
+            info!("🛰️ Scanning Tailscale cluster mesh on port {}...", port);
+            let nodes = TailscaleInspector::discover_cluster_nodes(port).await?;
+
+            println!("\n==========================================================================================");
+            println!("                           AEROMESH CLUSTER NODE STATUS                                   ");
+            println!("==========================================================================================");
+            println!("{:<24} {:<16} {:<12} {:<18} {:<12} {:<16}", "NODE / HOSTNAME", "TAILSCALE IP", "TS STATUS", "LINK TYPE", "LATENCY", "RPC DAEMON");
+            println!("------------------------------------------------------------------------------------------");
+
+            let mut ready_count = 0;
+            for node in &nodes {
+                let ts_status = if node.is_tailscale_active { "ONLINE" } else { "OFFLINE" };
+                let link_type = if node.is_self {
+                    "Local Host"
+                } else if node.is_direct_wireguard {
+                    "Direct WireGuard"
+                } else if let Some(relay) = &node.relay_region {
+                    &format!("DERP ({})", relay)
+                } else {
+                    "DERP Relay"
+                };
+
+                let latency_str = if let Some(rtt) = node.rtt_ms {
+                    format!("{:.1} ms", rtt)
+                } else {
+                    "N/A".into()
+                };
+
+                let rpc_status = if node.is_self {
+                    "Coordinator"
+                } else if node.rpc_online {
+                    if node.cluster_ready { "✅ READY" } else { "⚠️ HIGH PING" }
+                } else {
+                    "❌ STOPPED"
+                };
+
+                if node.is_self || node.cluster_ready {
+                    ready_count += 1;
+                }
+
+                println!("{:<24} {:<16} {:<12} {:<18} {:<12} {:<16}", node.host_name, node.ip, ts_status, link_type, latency_str, rpc_status);
+            }
+
+            println!("==========================================================================================");
+            println!("  Total Nodes Discovered: {} | Active Compute Nodes Ready: {}", nodes.len(), ready_count);
+            println!("==========================================================================================\n");
+        }
+
         Commands::ModelCheck { path } => {
             let model_path = resolve_model_path(path.as_ref())?;
             info!("🔍 Inspecting GGUF model integrity at {:?}", model_path);
