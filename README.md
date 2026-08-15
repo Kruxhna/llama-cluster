@@ -1,10 +1,10 @@
-# 🚀 AeroMesh: Distributed Fault-Tolerant LLM Cluster Engine
+#   AeroMesh: Distributed Fault-Tolerant LLM Cluster Engine
 
 AeroMesh aggregates heterogeneous consumer laptops (Windows + NVIDIA GPUs) into a unified, high-throughput LLM inference cluster interconnected via **Tailscale** and local networks.
 
 ---
 
-## ⚡ Quickstart Guide for Teammates
+##  Quickstart Guide for Teammates
 
 ### 1. Prerequisites
 - **OS**: Windows 10/11 (64-bit)
@@ -25,7 +25,7 @@ Open **PowerShell** in the project folder and run:
 
 ### 3. How to Run the Cluster
 
-#### 🖥️ On Worker Laptops (e.g., Laptop B & C):
+####  On Worker Laptops (e.g., Laptop B & C):
 1. Place the `.gguf` model file inside the `models/` folder.
 2. Start the worker daemon:
    ```powershell
@@ -39,7 +39,7 @@ Open **PowerShell** in the project folder and run:
 
 ---
 
-#### 🎮 On the Coordinator Laptop (e.g., Laptop A):
+####  On the Coordinator Laptop (e.g., Laptop A):
 1. Verify the model file hash across nodes:
    ```powershell
    cargo run --bin aeromesh -- model-check "models/test.gguf"
@@ -59,7 +59,7 @@ Open **PowerShell** in the project folder and run:
 
 ---
 
-## 🛠️ CLI Command Reference
+##  CLI Command Reference
 
 | Command | Description |
 |---|---|
@@ -70,7 +70,7 @@ Open **PowerShell** in the project folder and run:
 
 ---
 
-## 📂 Project Architecture
+##  Project Architecture
 
 ```
 llama-cluster/
