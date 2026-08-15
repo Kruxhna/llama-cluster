@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/aeromesh-core",
+    "crates/aeromesh-engine",
+    "crates/aeromesh-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AeroMesh Engineering Team"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.5", features = ["derive", "cargo"] }
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
+sha2 = "0.10"
+hex = "0.4"
+futures-util = "0.3"
+tokio-stream = "0.1"
+sysinfo = "0.31"
+reqwest = { version = "0.12", features = ["json", "stream"] }

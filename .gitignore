@@ -1,10 +1,30 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Rust build output
+target/
+Cargo.lock
 
-# Virtual environments
-.venv
+# Python virtual environment & cache
+.venv/
+__pycache__/
+*.pyc
+
+# Local binary builds & submodules
+llama.cpp/
+build/
+bin/*.exe
+bin/*.dll
+bin/*.lib
+bin/*.pdb
+*.exe
+*.dll
+
+# Large AI Model Weights (Pre-staged locally on NVMe)
+models/*.gguf
+*.gguf
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.log
+.DS_Store
+Thumbs.db
