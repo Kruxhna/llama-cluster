@@ -1,3 +1,7 @@
+# Rust build output
+target/
+Cargo.lock
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -21,6 +25,7 @@ llama.cpp/out/
 models/*.gguf
 models/*.bin
 models/*.safetensors
+*.gguf
 !models/.gitkeep
 
 # Virtual environments

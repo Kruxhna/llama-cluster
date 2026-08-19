@@ -1,0 +1,20 @@
+[package]
+name = "aeromesh-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "aeromesh"
+path = "src/main.rs"
+
+[dependencies]
+aeromesh-core = { path = "../aeromesh-core" }
+aeromesh-engine = { path = "../aeromesh-engine" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
