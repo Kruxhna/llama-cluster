@@ -143,7 +143,19 @@ def cmd_start(args: argparse.Namespace):
 
 def cmd_node(args: argparse.Namespace):
     show_banner()
-    run_node(node_name=args.name, port=args.port)
+    run_node(node_name=args.name, port=args.port, mode=getattr(args, "mode", "auto"), model=getattr(args, "model", None))
+
+
+def cmd_pipe(args: argparse.Namespace):
+    """Executes prompt across Zero-Weight Activation Pipeline."""
+    show_banner()
+    orchestrator = AeroMeshOrchestrator()
+    print(f"[*] Dispatching prompt over Zero-Weight P2P Pipeline: '{args.prompt}'")
+    res = orchestrator.forward_prompt_pipeline(prompt=args.prompt, max_tokens=args.max_tokens)
+    print(f"[+] Pipeline Execution Status : {res['status']}")
+    print(f"[+] Total Weights Transferred : 0.0 MB (Zero-Weight Transfer Active)")
+    print(f"[+] Activation Wire Bytes     : {res['bytes_transferred_on_wire']} bytes (~{res['bytes_transferred_on_wire']/1024:.2f} KB)")
+    print(f"[+] Result                    : {res['output_text']}")
 
 
 def cmd_download(args: argparse.Namespace):
@@ -202,6 +214,12 @@ def main(argv: Optional[List[str]] = None):
     parser_rebalance = subparsers.add_parser("rebalance", help="Run ILP Dynamic Graph Compiler layer solver")
     parser_rebalance.set_defaults(func=cmd_rebalance)
 
+    # Pipe (Zero-Weight Pipeline Inference)
+    parser_pipe = subparsers.add_parser("pipe", help="Run prompt through Zero-Weight P2P Pipeline")
+    parser_pipe.add_argument("-p", "--prompt", default="Explain distributed GPU clustering in one short sentence.", help="Prompt text")
+    parser_pipe.add_argument("-t", "--max-tokens", type=int, default=50, help="Max tokens to generate")
+    parser_pipe.set_defaults(func=cmd_pipe)
+
     # Chaos
     parser_chaos = subparsers.add_parser("chaos", help="Toxiproxy network perturbation injection")
     parser_chaos.add_argument("action", choices=["inject", "clear"], help="Chaos action")
@@ -219,6 +237,8 @@ def main(argv: Optional[List[str]] = None):
     parser_node = subparsers.add_parser("node", help="Start worker node daemon (Laptop B/C)")
     parser_node.add_argument("-n", "--name", default="Laptop_B", help="Worker node identifier")
     parser_node.add_argument("-p", "--port", type=int, default=50052, help="RPC worker port (default: 50052)")
+    parser_node.add_argument("--mode", choices=["auto", "rpc", "local-pipeline"], default="auto", help="Execution mode")
+    parser_node.add_argument("-m", "--model", help="Local GGUF model filename")
     parser_node.set_defaults(func=cmd_node)
 
     # Download

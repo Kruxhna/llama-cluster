@@ -139,7 +139,7 @@ class DynamicGraphCompiler:
             z_ram = c["z_ram"]
 
             # High latency eviction (>300ms RTT forces node inactive)
-            if c["rtt_ms"] > 300.0:
+            if c["rtt_ms"] > 500.0:
                 prob += x_vars[nid] == 0, f"Evict_{nid}_Latency"
 
             # Constraint (7): n_m <= w_m
